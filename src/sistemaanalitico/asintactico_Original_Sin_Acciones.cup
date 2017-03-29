@@ -1,0 +1,178 @@
+package interpreteer;
+
+import java_cup.runtime.Symbol;
+import java.util.Vector;
+
+parser code
+{:
+    
+    Vector recuperables = new Vector(10,50);
+    Vector noRecuperables = new Vector(10,50);
+    Vector expresiones = new Vector(10,50);
+    Vector nombreExpresiones = new Vector(10,50); 
+    Vector elementosG = new Vector(10,50); 
+
+/* Metodo al que se llama automaticamente ante algun error sintactico.*/
+public void syntax_error(Symbol s){
+System.out.println("Error en la Linea " + (s.right+1) + " Columna "+s.left+ ". Identificador " +s.value + " no reconocido." );
+recuperables.addElement(s.value);
+}
+
+/**Metodo al que se llama en el momento en que ya no es posible una recuperacion de errores.*/
+public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception{
+System.out.println("Error irrecuperable en la Linea " + (s.right+1)+ " Columna "+s.left+". Identificador " + s.value + " no reconocido.");
+noRecuperables.addElement(s.value);
+} 
+    
+:}
+
+action code 
+{:  int contador = 0; 
+
+
+:}
+
+
+/*************************************************** DEFINICION DE TERMINALELS ***********************************************************/
+
+terminal String         tDoblePor
+,tPuntoComa
+,tConcatenacion
+,tUnoMas
+,tPor
+,tCeroUno
+,tOr
+,tSaltoLinea
+,tComillaS
+,tTab
+,tComillaD
+,tTodoV
+,tComa
+,tSeparadorC
+,tFlecha
+,tConj
+,tReserv
+,tError
+,tRetorno
+,tYyText
+,tYyRow
+,tYyCol
+,terrorM
+,tLlaveA
+,tLlaveC
+,tParentesisA
+,tParentesisC
+,tDosPts
+,tAscii
+,tLetra
+,tCadena
+,tNumero
+,tId;
+
+
+/*************************************************** DEFINICION DE NO TERMINALELS ********************************************************/
+   
+non terminal String  S
+,EXP1
+,EXP2
+,CONJ
+,OPCONJ
+,OPCOMA
+,OPCONJ1
+,ASCII
+,DEF
+,RETORNO
+,FINAL
+,CONTENIDO
+,ERROR;
+
+non terminal Expresion REGULAR;
+
+
+/***************************************************** PRECEDENCIA Y ASOCITIVIDAD ********************************************************/
+
+precedence left tOr;
+precedence left tConcatenacion;
+precedence left tUnoMas, tPor, tCeroUno;
+precedence left tParentesisA;
+
+/*************************************************************** GRAMATICA ****************************************************************/
+
+
+start with					S
+                            ;
+
+S::=                        tDoblePor EXP1 ERROR tDoblePor
+                            ;
+
+EXP1::=                     EXP2 EXP1 
+                            | EXP2     
+                            ;                       
+
+EXP2::=                     DEF
+                            |CONJ
+                            ;
+
+CONJ::=                     tConj tDosPts tId tFlecha OPCONJ tPuntoComa;
+
+OPCONJ::=                   ASCII tSeparadorC ASCII
+                            |tLetra tSeparadorC tLetra
+                            |tNumero tSeparadorC tNumero
+                            |OPCONJ1 tComa OPCOMA
+                            ;
+
+OPCOMA::=                   OPCONJ1 tComa OPCOMA
+                            |OPCONJ1
+                            ;
+
+OPCONJ1::=                  tNumero
+                            |tLetra
+                            |ASCII
+                            ;
+
+ASCII::=                    tAscii
+                            |tOr
+                            |tParentesisA
+                            |tParentesisC
+                            |tPor
+                            |tUnoMas
+                            |tComa
+                            |tConcatenacion
+                            |tDosPts
+                            |tPuntoComa
+                            |tCeroUno
+                            |tLlaveA
+                            |tLlaveC
+                            ;
+
+
+DEF::=                      tId:B tFlecha REGULAR:A tFlecha tRetorno RETORNO FINAL {: System.out.println(A.ExpReg.getClass()); expresiones.addElement(A.ExpReg); nombreExpresiones.addElement(B); elementosG.addElement(A.elementos); :}
+                            ;
+
+REGULAR::=                   tOr REGULAR:A REGULAR:B                {: OR nuevo = new OR(); RESULT = new Expresion(); nuevo.transicion2=A.ExpReg; nuevo.transicion5=B.ExpReg; RESULT.ExpReg = nuevo; RESULT.copiar(A.elementos); RESULT.copiar(B.elementos); RESULT.addEG(A.ExpReg); RESULT.addEG(B.ExpReg); :}
+                            |tConcatenacion REGULAR:A REGULAR:B     {: CONCAT nuevo = new CONCAT(); RESULT = new Expresion(); nuevo.transicion1=A.ExpReg; nuevo.transicion2=B.ExpReg; RESULT.ExpReg = nuevo; RESULT.copiar(A.elementos); RESULT.copiar(B.elementos); RESULT.addEG(A.ExpReg); RESULT.addEG(B.ExpReg); :}
+                            |tPor REGULAR:A                         {: CEROMAS nuevo = new CEROMAS(); RESULT = new Expresion(); nuevo.transicion2=A.ExpReg; RESULT.ExpReg = nuevo; RESULT.elementos = A.elementos; RESULT.addEG(A.ExpReg); :}
+                            |tCeroUno REGULAR:A                     {: CEROUNO nuevo = new CEROUNO(); RESULT = new Expresion(); nuevo.transicion2=A.ExpReg; RESULT.ExpReg = nuevo; RESULT.elementos = A.elementos; RESULT.addEG(A.ExpReg); :}
+                            |tUnoMas REGULAR:A                      {: UNOMAS nuevo = new UNOMAS();   RESULT = new Expresion(); nuevo.transicion2=A.ExpReg; RESULT.ExpReg = nuevo; RESULT.elementos = A.elementos; RESULT.addEG(A.ExpReg); :}                     
+                            |tId:A                                  {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
+                            |tCadena:A                              {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
+                            |tSaltoLinea:A                          {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
+                            |tComillaS:A                            {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
+                            |tTab:A                                 {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
+                            |tComillaD:A                            {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
+                            |tTodoV:A                               {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
+                            ;
+
+RETORNO::=                  tParentesisA tCadena tComa tYyText tComa tYyRow tComa tYyCol tParentesisC 
+                            ;
+
+FINAL::=                    tPuntoComa
+                            |tFlecha tReserv tLlaveA CONTENIDO tLlaveC tPuntoComa
+                            ;
+
+CONTENIDO::=                tCadena tFlecha tRetorno RETORNO tPuntoComa CONTENIDO
+                            |tCadena tFlecha tRetorno RETORNO tPuntoComa
+                            ;
+
+ERROR::=                    tError tFlecha REGULAR tFlecha terrorM tParentesisA tYyText tComa tYyRow tComa tYyCol tParentesisC tPuntoComa
+                            ;
