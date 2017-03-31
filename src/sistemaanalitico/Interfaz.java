@@ -5,19 +5,24 @@
  */
 package sistemaanalitico;
 
+import java.awt.Desktop;
 import java.awt.Image;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Enumeration;
 import java.util.Scanner;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.ButtonModel;
+import java_cup.runtime.Symbol;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
@@ -29,6 +34,7 @@ import javax.swing.JRadioButton;
  */
 public class Interfaz extends javax.swing.JFrame {
 
+    Interfaz n;
     JFileChooser exp;
     interpreteer.Graphviz generar = new interpreteer.Graphviz();
     int contador = 1;
@@ -40,6 +46,12 @@ public class Interfaz extends javax.swing.JFrame {
     Vector elementosE = new Vector(20,50);
     Vector estadosE = new Vector(20,50);
     Vector nombreT = new Vector(20,50);
+    
+    //ConjExpresiones ---- valores validos
+    Vector ConjExp = new Vector(20,50);
+    
+    // nombreTokens
+    Vector tokensName = new Vector(20,50);
     
     Boolean unomasT = false;
     Boolean ceromasT = false;
@@ -57,7 +69,7 @@ public class Interfaz extends javax.swing.JFrame {
         jMenu2.setText("Herramientas");
         jMenuItem1.setText("Abrir D-ER");
         jMenuItem2.setText("Guardar D-ER");
-        jMenuItem3.setText("Cargar Thompson");
+        jMenuItem3.setText("Analizar");
         jMenuItem4.setText("Guardar Token's");
         jMenuItem5.setText("Guardar Errores");
         jMenuItem6.setText("Ver Reporte");
@@ -69,6 +81,66 @@ public class Interfaz extends javax.swing.JFrame {
         jTextArea2.setLineWrap(true);
         jTextArea2.setWrapStyleWord(true);
         jTextArea2.setEditable(false);
+        n = this;
+        
+        // Servidor Via sockets
+        new Thread(new Runnable(){
+
+            @Override
+            public void run() {
+                try {
+                    //servidor creado---esperando conexion en puerto 35577
+                    System.out.println("Servidor activo");
+                    ServerSocket socket = new ServerSocket(5555);
+                    // se ha conectado un cliente
+                    Socket cliente = socket.accept();
+                    System.out.println("Conectado con cliente: "+cliente.getInetAddress());
+                    
+                    // flujo entrante desde el cliente
+                    String txt = recibir(cliente);
+
+                    // el cliente lee los datos hasta un max de 10 seg de espera
+                    cliente.setSoLinger(true, 10);
+                    
+                    // flujo de salida de datos -----> Aqui se envia el xml
+                    GenerarTokens xml = new GenerarTokens(tablaT,estadosE,elementosE,ConjExp,tokensName,txt);
+                    
+                    String txtE = "Esto deberia ser el XML";
+                    enviar(txtE,cliente);
+                    // se cierra la conexion con el cliente, setSoLinger espera a que el cliente retire los datos
+                    cliente.close();
+                    socket.close();
+                } catch (IOException ex) {
+                    System.out.println(ex.getMessage());
+                }
+            }
+            
+            public String recibir(Socket cliente) throws IOException{
+                InputStream is = cliente.getInputStream();
+                    byte[] lenBytes = new byte[4];
+                    is.read(lenBytes, 0, 4);
+                    int len = (((lenBytes[3] & 0xff)<<24)|((lenBytes[2] & 0xff)<<16)|((lenBytes[1] & 0xff)<<8)|(lenBytes[0] & 0xff));
+                    byte[] receivedBytes = new byte[len];
+                    is.read(receivedBytes, 0, len);
+                    String received = new String(receivedBytes, 0, len);
+                    JOptionPane.showMessageDialog(n, "Archivo D-trans:\n\n"+received);                
+                    System.out.println(received);
+                    return received;
+            }
+            
+            public void enviar (String txtE, Socket cliente) throws IOException{                
+                OutputStream os = cliente.getOutputStream();
+                byte[] toSendBytes = txtE.getBytes();
+                int toSendLen = toSendBytes.length;
+                byte[] toSendLenBytes = new byte[4];
+                toSendLenBytes[0] = (byte)(toSendLen & 0xff);
+                toSendLenBytes[1] = (byte)((toSendLen >> 8) & 0xff);
+                toSendLenBytes[2] = (byte)((toSendLen >> 16) & 0xff);
+                toSendLenBytes[3] = (byte)((toSendLen >> 24) & 0xff);
+                os.write(toSendLenBytes);
+                os.write(toSendBytes);
+            }
+        }).start();
     }
 
     /**
@@ -157,6 +229,11 @@ public class Interfaz extends javax.swing.JFrame {
         jMenu2.setText("Edit");
 
         jMenuItem3.setText("jMenuItem3");
+        jMenuItem3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem3ActionPerformed(evt);
+            }
+        });
         jMenu2.add(jMenuItem3);
 
         jMenuItem4.setText("jMenuItem4");
@@ -166,6 +243,11 @@ public class Interfaz extends javax.swing.JFrame {
         jMenu2.add(jMenuItem5);
 
         jMenuItem6.setText("jMenuItem6");
+        jMenuItem6.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem6ActionPerformed(evt);
+            }
+        });
         jMenu2.add(jMenuItem6);
 
         jMenuBar1.add(jMenu2);
@@ -176,61 +258,55 @@ public class Interfaz extends javax.swing.JFrame {
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 442, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(layout.createSequentialGroup()
-                                .addGap(38, 38, 38)
-                                .addComponent(jButton1))
-                            .addGroup(layout.createSequentialGroup()
-                                .addGap(28, 28, 28)
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, 106, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addComponent(jRadioButton1)
-                                    .addComponent(jRadioButton2))))
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(layout.createSequentialGroup()
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(jLabel1)
-                                    .addComponent(jLabel2))
-                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                            .addGroup(layout.createSequentialGroup()
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 26, Short.MAX_VALUE)
-                                .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 1233, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(0, 28, Short.MAX_VALUE))))
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 668, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(286, 286, 286))))
-        );
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jLabel1)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGap(866, 866, 866))
+            .addGroup(layout.createSequentialGroup()
+                .addGap(30, 30, 30)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 319, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addGroup(layout.createSequentialGroup()
-                                .addComponent(jRadioButton1)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jRadioButton2)
-                                .addGap(41, 41, 41)
-                                .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(48, 48, 48)
-                                .addComponent(jButton1)))
-                        .addGap(18, 18, 18)
-                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 297, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 690, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap())
+                                .addGap(10, 10, 10)
+                                .addComponent(jButton1))
+                            .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, 106, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jRadioButton1)
+                            .addComponent(jRadioButton2))
+                        .addGap(79, 79, 79)
+                        .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 1612, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                        .addGap(10, 10, 10)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 1087, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel2)
+                            .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 570, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                .addGap(0, 27, Short.MAX_VALUE))
+        );
+        layout.setVerticalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jLabel1)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 319, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(jRadioButton1)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(jRadioButton2)
+                        .addGap(41, 41, 41)
+                        .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(48, 48, 48)
+                        .addComponent(jButton1)))
+                .addGap(18, 18, 18)
+                .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(jScrollPane1)
+                    .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 297, Short.MAX_VALUE))
+                .addGap(32, 32, 32))
         );
 
         pack();
@@ -254,6 +330,7 @@ public class Interfaz extends javax.swing.JFrame {
                 s.close();
         }
         //System.out.println(a);
+        jTextArea1.append(a);
         Analizar(a);
     }//GEN-LAST:event_jMenuItem1ActionPerformed
 
@@ -289,6 +366,7 @@ public class Interfaz extends javax.swing.JFrame {
                     ImageIcon imagen = new ImageIcon("c:\\txt1\\"+nombre+".png");
                     ImageIcon icono = new ImageIcon(imagen.getImage().getScaledInstance(jLabel3.getWidth(), jLabel3.getHeight(), Image.SCALE_SMOOTH));
                     jLabel3.setIcon(icono);
+                    jTextArea2.setText("");
                 }
                 if ("AFD".equals(a.getText())) {
                     String nombre = (String) jComboBox1.getSelectedItem();                                        
@@ -299,20 +377,20 @@ public class Interfaz extends javax.swing.JFrame {
                     //estadosE
                     int posT = indiceTtransicion(nombre,nombreT);
                     if (posT!=100) {
-                        String temp[][] = (String[][]) tablaT.elementAt(posT);                        
-                        Vector temp1 = (Vector) elementosE.elementAt(posT);                          
-                        for (int i = 0; i < temp1.size(); i++) {
+                        String temp[][] = (String[][]) tablaT.elementAt(posT);                                                
+                        Vector temp1 = (Vector) elementosE.elementAt(posT);                           
+                        for (int i = temp1.size()-1; i >= 0; i--) {
                             String abc = String.valueOf(temp1.elementAt(i));
                             jTextArea2.append("\t"+abc);                            
                         }
                         
                         Vector temp2 = (Vector)estadosE.elementAt(posT);                        
                         
-                        for (int i = 0; i < temp.length; i++) {
+                        for (int i = temp.length-1; i >= 0; i--) {
                             jTextArea2.append("\n");                     
                             String abc = String.valueOf(temp2.elementAt(i));
                             jTextArea2.append(abc+"\t");
-                            for (int j = 0; j < temp[i].length; j++) {                                
+                            for (int j = temp[i].length-1; j >=0; j--) {                                
                                jTextArea2.append(temp[i][j]+"\t");
                             }
                         }
@@ -325,6 +403,128 @@ public class Interfaz extends javax.swing.JFrame {
         }        
         
     }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jMenuItem6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem6ActionPerformed
+        // abrir reporte de errores
+        File path = new File ("Errores.html");   
+        try {
+            Desktop.getDesktop().open(path);
+        } catch (IOException ex) {
+            System.out.println(ex.getMessage());
+        }
+    }//GEN-LAST:event_jMenuItem6ActionPerformed
+
+    private void jMenuItem3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem3ActionPerformed
+        // analizar
+        
+        contador = 1;
+        concatenado = 0;
+        estadosSubC.clear();
+        tablaT.clear();
+        elementosE.clear();
+        estadosE.clear();
+        nombreT.clear();
+        unomasT = false;
+        ceromasT = false;
+        jComboBox1.removeAllItems();
+        ConjExp.clear();
+        tokensName.clear();
+        
+        String texto = jTextArea1.getText();
+        FileWriter fichero = null;
+        PrintWriter pw = null;
+        
+        StringReader miReader = new StringReader(texto);
+        AnalizadorLexico miAnalizador = new AnalizadorLexico(miReader); 
+        miAnalizador.erroresLex.clear();
+        miAnalizador.erroresLexColumna.clear();
+        miAnalizador.erroresLexLinea.clear();
+        sintactico parser = new sintactico(miAnalizador);
+        
+        parser.ConjExp.clear();
+        parser.columnaNoRecuperables.clear();
+        parser.columnaRecuperables.clear();
+        parser.elementosG.clear();
+        parser.expresiones.clear();
+        parser.lineaNoRecuperables.clear();
+        parser.lineaRecuperables.clear();
+        parser.noRecuperables.clear();
+        parser.nombreExpresiones.clear();
+        parser.recuperables.clear();
+        parser.tokensName.clear();
+        
+        try {
+            System.out.println("Cadena Analizada: ");
+            parser.parse();            
+            // si hay errores
+            for (int i = 0; i < miAnalizador.erroresLex.size(); i+=2) {
+                    miAnalizador.erroresLex.removeElementAt(i);
+                    miAnalizador.erroresLexColumna.removeElementAt(i);
+                    miAnalizador.erroresLexLinea.removeElementAt(i);
+                }
+            
+            if ((parser.noRecuperables.isEmpty()) && parser.recuperables.isEmpty() && miAnalizador.erroresLex.isEmpty()) { // size igual a 0                                
+                JOptionPane.showMessageDialog(this, "Cadena aceptada");  
+                for (int i = 0; i < parser.ConjExp.size(); i++) {
+                    ConjExp.addElement(parser.ConjExp.elementAt(i));
+                }
+                for (int i = 0; i < parser.tokensName.size(); i++) {
+                    tokensName.addElement(parser.tokensName.elementAt(i));
+                    Def temp = (Def)tokensName.elementAt(i);                    
+                }
+            }else{                     
+                JOptionPane.showMessageDialog(this, "El archivo contiene errores");                                                
+                PrintHtml html = new PrintHtml(parser.noRecuperables,parser.lineaNoRecuperables,parser.columnaNoRecuperables,
+                        parser.recuperables,parser.lineaRecuperables,parser.columnaRecuperables,
+                        miAnalizador.erroresLex,miAnalizador.erroresLexColumna,miAnalizador.erroresLexLinea);
+                html.pagina();                                
+            }
+
+            // Graficar AFN
+            for (int i = 0; i < parser.expresiones.size(); i++) {
+                fichero = new FileWriter("C:\\txt1\\"+parser.nombreExpresiones.elementAt(i)+".txt");
+                pw = new PrintWriter(fichero);
+                pw.println("Digraph g{");
+                pw.println("graph[center=1 ,rankdir=LR];");
+                
+                // nombre de expresiones
+                //System.out.println("\n---"+parser.nombreExpresiones.elementAt(i)+"---");                
+                jComboBox1.addItem(parser.nombreExpresiones.elementAt(i));
+                
+                // elementos de la gramatica
+                Vector temp = (Vector) parser.elementosG.elementAt(i);                                 
+                //System.out.println("Conjunto de caracteres: "+temp+"\n");
+                
+                AddNumeroThompson(parser.expresiones.elementAt(i), pw);
+                
+                // elementos de la gramatica sin repetirse---Expresion regual, la primera transicion
+                SubConjuntos(temp, parser.expresiones.elementAt(i), (String)parser.nombreExpresiones.elementAt(i));
+                
+                
+                pw.println("}");
+                if(null!= fichero ){
+                    try {
+                        fichero.close();
+                    } catch (IOException ex) {
+                        System.out.println(ex.getMessage());
+                    }
+                }
+                generar.generarGrafica("C:\\txt1\\"+parser.nombreExpresiones.elementAt(i)+".txt", (String) parser.nombreExpresiones.elementAt(i));
+                // Conjuntos                
+            }
+            for (int j = 0; j < parser.ConjExp.size(); j++) {
+                    Conjuntos t = (Conjuntos)parser.ConjExp.elementAt(j);
+                    System.out.println("Nombre de Conjunto: "+t.nombre);
+                    if (t.conjComa.size()!=0) {
+                        System.out.println("Elementos: "+t.conjComa);
+                    }else{
+                        System.out.println("Rango: "+t.conjRaya);
+                    }
+                }
+        } catch (Exception ex) {
+            System.out.println(ex.getMessage());
+        }
+    }//GEN-LAST:event_jMenuItem3ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -361,33 +561,73 @@ public class Interfaz extends javax.swing.JFrame {
         });
     }
     
-    public void Analizar(String texto){
+    public void Analizar(String texto){ 
+        contador = 1;
+        concatenado = 0;
+        estadosSubC.clear();
+        tablaT.clear();
+        elementosE.clear();
+        estadosE.clear();
+        nombreT.clear();
+        unomasT = false;
+        ceromasT = false;
+        jComboBox1.removeAllItems();
+        ConjExp.clear();
+        tokensName.clear();
+        
         FileWriter fichero = null;
         PrintWriter pw = null;
         
         StringReader miReader = new StringReader(texto);
-        AnalizadorLexico miAnalizador = new AnalizadorLexico(miReader);
-        sintactico parser = new sintactico(miAnalizador);
+        AnalizadorLexico miAnalizador = new AnalizadorLexico(miReader); 
+        miAnalizador.erroresLex.clear();
+        miAnalizador.erroresLexColumna.clear();
+        miAnalizador.erroresLexLinea.clear();
+                
+        sintactico parser = new sintactico(miAnalizador);        
+        parser.ConjExp.clear();
+        parser.columnaNoRecuperables.clear();
+        parser.columnaRecuperables.clear();
+        parser.elementosG.clear();
+        parser.expresiones.clear();
+        parser.lineaNoRecuperables.clear();
+        parser.lineaRecuperables.clear();
+        parser.noRecuperables.clear();
+        parser.nombreExpresiones.clear();
+        parser.recuperables.clear();
+        parser.tokensName.clear();
         
         try {
             System.out.println("Cadena Analizada: ");
-            parser.parse();            
-            // si hay errores
-            if (parser.noRecuperables.isEmpty() && parser.recuperables.isEmpty()) { // size igual a 0                
-                //System.out.println("\nCadena Aceptada.");
-                JOptionPane.showMessageDialog(this, "Cadena aceptada");
-            }else{
-                
-                System.out.println("La cadena contiene errores: ");
-                for (int i = 0; i < parser.noRecuperables.size(); i++) {
-                    System.out.println(parser.noRecuperables.elementAt(i));
-                    //jTextArea1.setText((String) parser.noRecuperables.elementAt(i));
+            parser.parse();  
+            for (int i = 0; i < miAnalizador.erroresLex.size(); i+=2) {
+                    miAnalizador.erroresLex.removeElementAt(i);
+                    miAnalizador.erroresLexColumna.removeElementAt(i);
+                    miAnalizador.erroresLexLinea.removeElementAt(i);
                 }
-                for (int i = 0; i < parser.recuperables.size(); i++) {
-                    System.out.println(parser.recuperables.elementAt(i));
+            // si hay errores
+            if (parser.noRecuperables.isEmpty() && parser.recuperables.isEmpty() && miAnalizador.erroresLex.isEmpty()) { // size igual a 0                                
+                JOptionPane.showMessageDialog(this, "Cadena aceptada");    
+                for (int i = 0; i < parser.ConjExp.size(); i++) {
+                    ConjExp.addElement(parser.ConjExp.elementAt(i));
+                }
+                for (int i = 0; i < parser.tokensName.size(); i++) {
+                    tokensName.addElement(parser.tokensName.elementAt(i));
+                    Def temp = (Def)tokensName.elementAt(i);                    
+                }
+            }else{                
+                JOptionPane.showMessageDialog(this, "El archivo contiene errores");                
+                for (int i = 0; i < miAnalizador.erroresLex.size(); i+=2) {
+                    miAnalizador.erroresLex.removeElementAt(i);
+                    miAnalizador.erroresLexColumna.removeElementAt(i);
+                    miAnalizador.erroresLexLinea.removeElementAt(i);
                 }                
+                PrintHtml html = new PrintHtml(parser.noRecuperables,parser.lineaNoRecuperables,parser.columnaNoRecuperables,
+                        parser.recuperables,parser.lineaRecuperables,parser.columnaRecuperables,
+                        miAnalizador.erroresLex,miAnalizador.erroresLexColumna,miAnalizador.erroresLexLinea);
+                html.pagina();                                
             }
-
+            
             // Graficar AFN
             for (int i = 0; i < parser.expresiones.size(); i++) {
                 fichero = new FileWriter("C:\\txt1\\"+parser.nombreExpresiones.elementAt(i)+".txt");
@@ -396,12 +636,12 @@ public class Interfaz extends javax.swing.JFrame {
                 pw.println("graph[center=1 ,rankdir=LR];");
                 
                 // nombre de expresiones
-                System.out.println("\n---"+parser.nombreExpresiones.elementAt(i)+"---");                
+                //System.out.println("\n---"+parser.nombreExpresiones.elementAt(i)+"---");                
                 jComboBox1.addItem(parser.nombreExpresiones.elementAt(i));
                 
                 // elementos de la gramatica
                 Vector temp = (Vector) parser.elementosG.elementAt(i);                                 
-                System.out.println("Conjunto de caracteres: "+temp+"\n");
+                //System.out.println("Conjunto de caracteres: "+temp+"\n");
                 
                 AddNumeroThompson(parser.expresiones.elementAt(i), pw);
                 
@@ -418,7 +658,17 @@ public class Interfaz extends javax.swing.JFrame {
                     }
                 }
                 generar.generarGrafica("C:\\txt1\\"+parser.nombreExpresiones.elementAt(i)+".txt", (String) parser.nombreExpresiones.elementAt(i));
-            }            
+                // Conjuntos                
+            }
+            for (int j = 0; j < parser.ConjExp.size(); j++) {
+                    Conjuntos t = (Conjuntos)parser.ConjExp.elementAt(j);
+                    System.out.println("Nombre de Conjunto: "+t.nombre);
+                    if (t.conjComa.size()!=0) {
+                        System.out.println("Elementos: "+t.conjComa);
+                    }else{
+                        System.out.println("Rango: "+t.conjRaya);
+                    }
+                }
         } catch (Exception ex) {
             System.out.println(ex.getMessage());
         }
@@ -445,7 +695,8 @@ public class Interfaz extends javax.swing.JFrame {
         }else{  // si es String            
             //System.out.println(inicial);
             contador = 2;
-            pw.println("1 -> 2 [fontsize=20, label="+inicial+"]");  
+            String ini = String.valueOf(inicial).replaceAll("\"", "");
+            pw.println("1 -> 2 [fontsize=20, label=\""+ini+"\"]");  
             pw.println(contador+" [peripheries=2]");
         }
     }
@@ -656,10 +907,9 @@ public class Interfaz extends javax.swing.JFrame {
         }
     }
     
-    
     public void SubConjuntos(Vector elementos, Object Expresion, String nombre){   
         nombreT.addElement(nombre);
-        elementosE.addElement(elementos);
+        
         int aceptacion = 0;
         FileWriter fichero = null;        
         PrintWriter pw = null;
@@ -676,7 +926,7 @@ public class Interfaz extends javax.swing.JFrame {
         String a[] = Expresion.getClass().getCanonicalName().split("\\.");
         
         if (a.length==2){                        
-            
+            elementosE.addElement(elementos);
             epsilon(a[1], Expresion, nuevo);            
             if ("CEROMAS".equals(a[1])) {
                 CEROMAS A = (CEROMAS)Expresion;
@@ -726,9 +976,6 @@ public class Interfaz extends javax.swing.JFrame {
             estadosE.addElement(nuevo.nombre); 
             String [][] transiciones= new String[nuevo.nombre.size()][elementos.size()];                        
             
-            
-            
-            //System.out.println(nuevo.cerraduras.size());
             for (int i = nuevo.cerraduras.size()-1; i >= 0; i--) {
                 //System.out.println(nuevo.cerraduras.elementAt(i)+" = "+ nuevo.nombre.elementAt(i));                
                 for (int j = 0; j < nuevo.irNumero.size(); j++) {
@@ -750,19 +997,12 @@ public class Interfaz extends javax.swing.JFrame {
                     }
                 }                
             }
-                        
-            //System.out.println("\t");
-            for (int i = 0; i < elementos.size(); i++) {
-                //System.out.print("\t"+elementos.elementAt(i));
-            }
-            for (int i = 0; i < transiciones.length; i++) { //Filas
-                //System.out.println("");
-                //System.out.print(nuevo.nombre.elementAt(i)+"\t");
+            
+            for (int i = 0; i < transiciones.length; i++) { //Filas            
                 for (int j = 0; j < transiciones[i].length; j++) { // Columnas
                     if (transiciones[i][j]==null) {
                         transiciones[i][j] = "-";
-                    }
-                    //System.out.print(transiciones[i][j]+"\t");
+                    }                    
                 }
             }
             
@@ -794,30 +1034,25 @@ public class Interfaz extends javax.swing.JFrame {
                     }
                 }
             generar.generarGrafica("C:\\txt1\\"+nombre+"1.txt", nombre+"1");
-        }else{  // si es String   
-        
+        }else{  // si es String                       
 //            //estados
             Vector temp = new Vector(5,10);
             temp.addElement("A");
-            temp.addElement("B");
+            temp.addElement("B*");
             estadosE.addElement(temp);
-            System.out.println(temp);
-////            
+            
 ////            //elementos
             Vector temp1 = new Vector(5,10);
-            temp1.addElement(Expresion);  
-            System.out.println(temp1);
-//            
+            temp1.addElement(Expresion);              
+            elementosE.addElement(temp1);
+            
             String l[][] = new String[2][1];
             l[0][0] = "B";
             l[1][0] = "-";            
             tablaT.addElement(l);
-            
-            pw.println("A"+" -> "+"B"+" [fontsize=20, label="+Expresion+"]");
-            pw.println("B"+" [peripheries=2]");
-            System.out.println("ir: "+Expresion+"=2");
-            System.out.println("Cerradura: 1");   
-            
+            String ta = String.valueOf(Expresion).replaceAll("\"", "");
+            pw.println("A"+" -> "+"B"+" [fontsize=20, label=\""+ta+"\"]");
+            pw.println("B"+" [peripheries=2]");                        
             pw.println("}");
                 if(null!= fichero ){
                     try {

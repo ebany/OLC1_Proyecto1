@@ -1,23 +1,26 @@
-package interpreteer;
+package sistemaanalitico;
 
 import java_cup.runtime.*;
 import java.io.Reader;
+import java.util.Vector;
       
 %%
 
 %class AnalizadorLexico
 
+%unicode
 %line
 %column 
-// %ignorecase 
-
 %cup
 
 
 %{
 
     /***************************************  Generamos un java_cup.symbol para guardar el tipo de token encontrado **********************************************/
-    
+    Vector erroresLex = new Vector(5,10);
+    Vector erroresLexLinea = new Vector(5,10);
+    Vector erroresLexColumna = new Vector(5,10);
+
     private Symbol symbol(int type) {
         return new Symbol(type, yyline, yycolumn);
     }
@@ -35,8 +38,6 @@ import java.io.Reader;
 /*********************************************************** Expresiones Regulares ***********************************************************/
 
 Ascii		= 	[!-/:-@\\-`{-}]
-
-
 Letra       =   [a-zA-ZñÑ]
 numero 		=   [0-9]+
 cadena 		= 	[\"][^\"\n]+[\"]						
@@ -70,7 +71,6 @@ id 			=   {Letra}({Letra}|{numero}|_)+
 "->"                                    {/*System.out.print("->	");*/ return symbol(sym.tFlecha,yytext()); }
 "CONJ"                                  {/*System.out.print("CONJ 	");*/ return symbol(sym.tConj,yytext()); }
 "RESERV"                                {/*System.out.print("RESERV 	");*/ return symbol(sym.tReserv,yytext()); }
-"Error"                                 {/*System.out.print("Error 	");*/ return symbol(sym.tError,yytext()); }
 "retorno"                               {/*System.out.print("retorno 	");*/ return symbol(sym.tRetorno,yytext()); }
 "yytext"                                {/*System.out.print("yytext 	");*/ return symbol(sym.tYyText,yytext()); }
 "yyrow"                                 {/*System.out.print("yyrow 	");*/ return symbol(sym.tYyRow,yytext()); }
@@ -86,7 +86,7 @@ id 			=   {Letra}({Letra}|{numero}|_)+
 
 [\n]  					{/*System.out.print("\n");*/ }
 
-{Ascii}					{/*System.out.print(yytext() + " ");*/ return symbol(sym.tAscii,yytext()); }
+{Ascii}					{System.out.print(yytext() + " "); return symbol(sym.tAscii,yytext()); }
 
 {Letra}					{/*System.out.print(yytext() + " ");*/ return symbol(sym.tLetra,yytext()); }
 
@@ -97,6 +97,6 @@ id 			=   {Letra}({Letra}|{numero}|_)+
 {id}					{/*System.out.print(yytext() + " ");*/ return symbol(sym.tId,yytext()); }
 
 
-.						{/*System.out.print("Error Lexico vino : "+yytext()+" en la linea "+(yyline+1)+" y columna "+(yychar+1));*/ }
+.                       { erroresLex.addElement(yytext()); erroresLexLinea.addElement(yyline+1); erroresLexColumna.addElement(yychar+1); }
 
 }

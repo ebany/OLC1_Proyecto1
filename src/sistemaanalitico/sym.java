@@ -8,40 +8,39 @@ package sistemaanalitico;
 /** CUP generated class containing symbol constants. */
 public class sym {
   /* terminals */
-  public static final int tLlaveA = 25;
+  public static final int tLlaveA = 24;
   public static final int tReserv = 18;
-  public static final int tCadena = 32;
-  public static final int tLetra = 31;
-  public static final int tDosPts = 29;
+  public static final int tCadena = 31;
+  public static final int tLetra = 30;
+  public static final int tDosPts = 28;
   public static final int tConj = 17;
-  public static final int tRetorno = 20;
-  public static final int tError = 19;
+  public static final int tRetorno = 19;
   public static final int tFlecha = 16;
   public static final int tComillaS = 10;
-  public static final int tParentesisC = 28;
+  public static final int tParentesisC = 27;
   public static final int tDoblePor = 2;
-  public static final int tParentesisA = 27;
+  public static final int tParentesisA = 26;
   public static final int tUnoMas = 5;
   public static final int tPuntoComa = 3;
   public static final int EOF = 0;
   public static final int tSaltoLinea = 9;
   public static final int tComillaD = 12;
   public static final int tOr = 8;
-  public static final int tNumero = 33;
+  public static final int tNumero = 32;
   public static final int tTab = 11;
   public static final int error = 1;
-  public static final int terrorM = 24;
-  public static final int tYyCol = 23;
-  public static final int tYyText = 21;
-  public static final int tAscii = 30;
-  public static final int tYyRow = 22;
-  public static final int tId = 34;
+  public static final int terrorM = 23;
+  public static final int tYyCol = 22;
+  public static final int tYyText = 20;
+  public static final int tAscii = 29;
+  public static final int tYyRow = 21;
+  public static final int tId = 33;
   public static final int tTodoV = 13;
   public static final int tPor = 6;
   public static final int tCeroUno = 7;
   public static final int tSeparadorC = 15;
   public static final int tConcatenacion = 4;
-  public static final int tLlaveC = 26;
+  public static final int tLlaveC = 25;
   public static final int tComa = 14;
   public static final String[] terminalNames = new String[] {
   "EOF",
@@ -63,7 +62,6 @@ public class sym {
   "tFlecha",
   "tConj",
   "tReserv",
-  "tError",
   "tRetorno",
   "tYyText",
   "tYyRow",

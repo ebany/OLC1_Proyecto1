@@ -1,27 +1,44 @@
-package interpreteer;
+package sistemaanalitico;
 
 import java_cup.runtime.Symbol;
 import java.util.Vector;
 
 parser code
 {:
-    
+    // Errores Recuperables
     Vector recuperables = new Vector(10,50);
+    Vector lineaRecuperables = new Vector (10,50);
+    Vector columnaRecuperables = new Vector(10,50);
+    // errores no recuperables
     Vector noRecuperables = new Vector(10,50);
+    Vector lineaNoRecuperables = new Vector (10,50);
+    Vector columnaNoRecuperables = new Vector(10,50);
+    
+    // elementos metodo thompson y cerradura
     Vector expresiones = new Vector(10,50);
     Vector nombreExpresiones = new Vector(10,50); 
-    Vector elementosG = new Vector(10,50); 
+    Vector elementosG = new Vector(10,50);
+
+    // conjuntos
+    Vector ConjExp = new Vector(10,50);
+
+    //nombre de tokens
+    Vector tokensName = new Vector(10,50);
 
 /* Metodo al que se llama automaticamente ante algun error sintactico.*/
 public void syntax_error(Symbol s){
-System.out.println("Error en la Linea " + (s.right+1) + " Columna "+s.left+ ". Identificador " +s.value + " no reconocido." );
-recuperables.addElement(s.value);
+    System.out.println("Error en la Linea " + (s.right+1) + " Columna "+s.left+ ". Identificador " +s.value + " no reconocido." );
+    recuperables.addElement(s.value);
+    lineaRecuperables.addElement(s.right+1);
+    columnaRecuperables.addElement(s.left);
 }
 
 /**Metodo al que se llama en el momento en que ya no es posible una recuperacion de errores.*/
 public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception{
-System.out.println("Error irrecuperable en la Linea " + (s.right+1)+ " Columna "+s.left+". Identificador " + s.value + " no reconocido.");
-noRecuperables.addElement(s.value);
+    System.out.println("Error irrecuperable en la Linea " + (s.right+1)+ " Columna "+s.left+". Identificador " + s.value + " no reconocido.");
+    noRecuperables.addElement(s.value);
+    lineaNoRecuperables.addElement(s.right+1);
+    columnaNoRecuperables.addElement(s.left);
 } 
     
 :}
@@ -52,7 +69,6 @@ terminal String         tDoblePor
 ,tFlecha
 ,tConj
 ,tReserv
-,tError
 ,tRetorno
 ,tYyText
 ,tYyRow
@@ -76,16 +92,14 @@ non terminal String  S
 ,EXP1
 ,EXP2
 ,CONJ
-,OPCONJ
-,OPCOMA
 ,OPCONJ1
 ,ASCII
 ,DEF
 ,RETORNO
-,FINAL
-,CONTENIDO
 ,ERROR;
 
+non terminal Def FINAL, CONTENIDO;
+non terminal Conjuntos OPCOMA, OPCONJ;
 non terminal Expresion REGULAR;
 
 
@@ -102,7 +116,7 @@ precedence left tParentesisA;
 start with					S
                             ;
 
-S::=                        tDoblePor EXP1 ERROR tDoblePor
+S::=                        tDoblePor EXP1 tDoblePor
                             ;
 
 EXP1::=                     EXP2 EXP1 
@@ -111,42 +125,45 @@ EXP1::=                     EXP2 EXP1
 
 EXP2::=                     DEF
                             |CONJ
+                            |ERROR 
+                            | error tPuntoComa EXP2                         
                             ;
 
-CONJ::=                     tConj tDosPts tId tFlecha OPCONJ tPuntoComa;
-
-OPCONJ::=                   ASCII tSeparadorC ASCII
-                            |tLetra tSeparadorC tLetra
-                            |tNumero tSeparadorC tNumero
-                            |OPCONJ1 tComa OPCOMA
+CONJ::=                     tConj tDosPts tId:A tFlecha OPCONJ:B tPuntoComa {:B.nombre = A; ConjExp.addElement(B); :}
                             ;
 
-OPCOMA::=                   OPCONJ1 tComa OPCOMA
-                            |OPCONJ1
+OPCONJ::=                   ASCII:A tSeparadorC ASCII:B         {:RESULT = new Conjuntos(); RESULT.conjRaya.addElement(A); RESULT.conjRaya.addElement(B); :}
+                            |tLetra:A tSeparadorC tLetra:B      {:RESULT = new Conjuntos(); RESULT.conjRaya.addElement(A); RESULT.conjRaya.addElement(B); :}
+                            |tNumero:A tSeparadorC tNumero:B    {:RESULT = new Conjuntos(); RESULT.conjRaya.addElement(A); RESULT.conjRaya.addElement(B); :}
+                            |OPCONJ1:A tComa OPCOMA:B           {:RESULT = new Conjuntos(); RESULT.conjComa.addElement(A); for (int i = 0;i<B.conjComa.size(); i++ ) { if (!RESULT.conjComa.contains(B.conjComa.elementAt(i))) { RESULT.conjComa.addElement(B.conjComa.elementAt(i)); } }:}
                             ;
 
-OPCONJ1::=                  tNumero
-                            |tLetra
-                            |ASCII
+OPCOMA::=                   OPCONJ1:A tComa OPCOMA:B        {:RESULT = new Conjuntos(); RESULT.conjComa.addElement(A); for (int i = 0;i<B.conjComa.size(); i++ ) { if (!RESULT.conjComa.contains(B.conjComa.elementAt(i))) { RESULT.conjComa.addElement(B.conjComa.elementAt(i)); } }  :}
+                            |OPCONJ1:A                      {:RESULT = new Conjuntos(); RESULT.conjComa.addElement(A); :}
                             ;
 
-ASCII::=                    tAscii
-                            |tOr
-                            |tParentesisA
-                            |tParentesisC
-                            |tPor
-                            |tUnoMas
-                            |tComa
-                            |tConcatenacion
-                            |tDosPts
-                            |tPuntoComa
-                            |tCeroUno
-                            |tLlaveA
-                            |tLlaveC
+OPCONJ1::=                  tNumero:A               {:RESULT = A; :}
+                            |tLetra:A               {:RESULT = A; :}
+                            |ASCII:A                {:RESULT = A; :}
+                            ;
+
+ASCII::=                    tAscii:A                {:RESULT = A; :}
+                            |tOr:A                  {:RESULT = A; :}
+                            |tParentesisA:A         {:RESULT = A; :}
+                            |tParentesisC:A         {:RESULT = A; :}
+                            |tPor:A                 {:RESULT = A; :}
+                            |tUnoMas:A              {:RESULT = A; :}
+                            |tComa:A                {:RESULT = A; :}
+                            |tConcatenacion:A       {:RESULT = A; :}
+                            |tDosPts:A              {:RESULT = A; :}
+                            |tPuntoComa:A           {:RESULT = A; :}
+                            |tCeroUno:A             {:RESULT = A; :}
+                            |tLlaveA:A              {:RESULT = A; :}
+                            |tLlaveC:A              {:RESULT = A; :}
                             ;
 
 
-DEF::=                      tId:B tFlecha REGULAR:A tFlecha tRetorno RETORNO FINAL {: System.out.println(A.ExpReg.getClass()); expresiones.addElement(A.ExpReg); nombreExpresiones.addElement(B); elementosG.addElement(A.elementos); :}
+DEF::=                      tId:B tFlecha REGULAR:A tFlecha tRetorno RETORNO:C FINAL:D {: System.out.println(A.ExpReg.getClass()); expresiones.addElement(A.ExpReg); nombreExpresiones.addElement(B); elementosG.addElement(A.elementos); D.retXdef = C; tokensName.addElement(D); :}                            
                             ;
 
 REGULAR::=                   tOr REGULAR:A REGULAR:B                {: OR nuevo = new OR(); RESULT = new Expresion(); nuevo.transicion2=A.ExpReg; nuevo.transicion5=B.ExpReg; RESULT.ExpReg = nuevo; RESULT.copiar(A.elementos); RESULT.copiar(B.elementos); RESULT.addEG(A.ExpReg); RESULT.addEG(B.ExpReg); :}
@@ -163,16 +180,16 @@ REGULAR::=                   tOr REGULAR:A REGULAR:B                {: OR nuevo 
                             |tTodoV:A                               {: RESULT = new Expresion(); RESULT.ExpReg = A; :}
                             ;
 
-RETORNO::=                  tParentesisA tCadena tComa tYyText tComa tYyRow tComa tYyCol tParentesisC 
+RETORNO::=                  tParentesisA tCadena:A tComa tYyText tComa tYyRow tComa tYyCol tParentesisC {:RESULT = A; :}
                             ;
 
-FINAL::=                    tPuntoComa
-                            |tFlecha tReserv tLlaveA CONTENIDO tLlaveC tPuntoComa
+FINAL::=                    tPuntoComa                                                      {:RESULT = new Def(); :}
+                            |tFlecha tReserv tLlaveA CONTENIDO:A tLlaveC tPuntoComa         {:RESULT = new Def(); RESULT = A; :}
                             ;
 
-CONTENIDO::=                tCadena tFlecha tRetorno RETORNO tPuntoComa CONTENIDO
-                            |tCadena tFlecha tRetorno RETORNO tPuntoComa
+CONTENIDO::=                tCadena:A tFlecha tRetorno RETORNO:B tPuntoComa CONTENIDO:C     {:RESULT = new Def(); RESULT = C; RESULT.retRes.addElement(B); RESULT.texto.addElement(A); :}
+                            |tCadena:A tFlecha tRetorno RETORNO:B tPuntoComa                {:RESULT = new Def(); RESULT.retRes.addElement(B); RESULT.texto.addElement(A); :}
                             ;
 
-ERROR::=                    tError tFlecha REGULAR tFlecha terrorM tParentesisA tYyText tComa tYyRow tComa tYyCol tParentesisC tPuntoComa
+ERROR::=                    tId:B tFlecha REGULAR:A tFlecha terrorM tParentesisA tYyText tComa tYyRow tComa tYyCol tParentesisC tPuntoComa {: System.out.print(A.ExpReg.getClass()); System.out.println(A.ExpReg); expresiones.addElement(A.ExpReg); nombreExpresiones.addElement(B); elementosG.addElement(A.elementos); :}
                             ;
